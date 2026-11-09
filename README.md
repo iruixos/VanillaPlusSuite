@@ -235,6 +235,6 @@ This is a **shortened example**, not the complete default death-message library.
 
 ## License
 
-Reapwright is licensed under the MIT License.
+VanillaPlusSuite is licensed under the MIT License.
 See the [LICENSE](LICENSE) file for details.
 
