@@ -1,0 +1,27 @@
+name: VanillaPlusSuite
+version: '1.1.0'
+main: com.iruixos.vanillaplussuite.VanillaPlusSuite
+api-version: '26.3'
+author: iruixos
+description: Modular Vanilla+ quality-of-life suite.
+commands:
+  sign:
+    description: Format the sign you are looking at
+    usage: /sign <color|bold|italic|reset> [color] [line]
+  vps:
+    description: VanillaPlusSuite administration
+    usage: /vps reload
+    permission: vanillaplussuite.admin
+permissions:
+  vanillaplussuite.admin:
+    default: op
+  vanillaplussuite.sign.color:
+    default: true
+  vanillaplussuite.sign.format:
+    default: op
+  vanillaplussuite.sign.hex:
+    default: true
+  vanillaplussuite.sign.command:
+    default: true
+  vanillaplussuite.sign.admin:
+    default: op
