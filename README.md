@@ -1,3 +1,5 @@
+![VanillaPlusSuite Banner](assets/header.png)
+
 # VanillaPlusSuite
 
 **Small quality-of-life improvements. Familiar vanilla survival.**
