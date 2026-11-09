@@ -216,22 +216,6 @@ death-messages:
 
 This is a **shortened example**, not the complete default death-message library. The bundled config includes categories for fall, contextual falls, lava, fire, drowning, lightning, void, suffocation, starvation, freezing, magic, explosions, projectiles, mobs, village-adjacent mob deaths, PvP, Nether, and generic deaths. Use `{player}` for the deceased player and `{killer}` for PvP messages.
 
-## Startup console banner
-
-VanillaPlusSuite prints a compact ASCII banner **every time the plugin enables**:
-
-```text
-[VanillaPlusSuite]
-[VanillaPlusSuite]   +--------------------------------+
-[VanillaPlusSuite]   | [V+] VanillaPlusSuite v1.1.0   |
-[VanillaPlusSuite]   |      by iruixos                |
-[VanillaPlusSuite]   |      Paper 26.3 / MC 26.3      |
-[VanillaPlusSuite]   +--------------------------------+
-[VanillaPlusSuite]
-```
-
-The plugin version and Minecraft version are detected dynamically, and the box adjusts to the displayed text. The banner is always enabled; there is **no configuration toggle**. The `Paper` label shows the Minecraft version, not the full Paper build identifier.
-
 ## Design and compatibility notes
 
 - Intended for a **near-vanilla Hard Survival** experience.
@@ -241,4 +225,16 @@ The plugin version and Minecraft version are detected dynamically, and the box a
 - Bee Colony Cooperation is experimental and needs longer-term in-game validation.
 - Test upgrades on a staging server, particularly when other plugins also alter signs, bee AI, or block interactions.
 
-**Author:** iruixos
+## Project information
+
+- **Plugin:** VanillaPlusSuite
+- **Author:** iruixos
+- **Platform:** Paper
+- **Package:** `com.iruixos.vanillaplussuite`
+- **Notes:** This project contains AI-generated code, but was tested by a human in a real PaperMC server :)
+
+## License
+
+Reapwright is licensed under the MIT License.
+See the [LICENSE](LICENSE) file for details.
+
