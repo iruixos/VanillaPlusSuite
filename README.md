@@ -22,6 +22,8 @@ VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft serve
 | **Bee Colony Cooperation** *(experimental)* | Helps nectar-carrying bees find other hives when their home hive is honey-full, and adds occupancy inspection, activity particles, improved hive selection, relocation assistance, and rain shelter behaviour. |
 | **AFK Detection** | Automatically marks inactive players AFK or lets them toggle it using `/afk`, with configurable escalating manual-command cooldowns, Tab-list/overhead nametags, and announcements. No gameplay immunity. |
 | **Armored Elytras** | Combine an Elytra and chestplate, keep their armor bonuses, then separate them; supports dropped-item or workstation GUI interactions. |
+| **Persistent Passive Animal Drops** | Extend the ground lifetime of naturally produced eggs, armadillo scutes, tamed-cat morning gifts, and panda slimeballs, with an optional indefinite setting. |
+| **Unusual Block Breakage** | Recover budding amethyst in Survival using a Silk Touch pickaxe. |
 
 ### Iron doors and trapdoors
 
@@ -47,7 +49,7 @@ Other optional behaviours:
 
 ### AFK detection
 
-Players automatically enter AFK status after a configurable inactivity period (five minutes by default). `/afk` manually toggles the status, subject to a configurable escalating cooldown intended to discourage chat announcement spam. Movement, looking around, chatting, commands other than `/afk`, interactions, and inventory activity can clear it. While AFK, the player's name is dark grey and `[AFK]` is yellow in the Tab list and, when supported by the viewer's scoreboard, the overhead nametag. The marker can appear as a prefix or suffix.
+Players automatically enter AFK status after a configurable inactivity period (five minutes by default). `/afk` manually toggles the status, subject to a configurable escalating cooldown intended to discourage chat announcement spam. Actual player movement input, looking around, chatting, commands other than `/afk`, interactions, and inventory activity can clear it. Passive displacement from mob collisions, flowing water, or knockback alone does not count as player activity. While AFK, the player's name is dark grey and `[AFK]` is yellow in the Tab list and, when supported by the viewer's scoreboard, the overhead nametag. The marker can appear as a prefix or suffix.
 
 Public messages announce when someone goes AFK and returns; a separate private return confirmation is optional. Successful manual `/afk` uses increase the cooldown, while blocked attempts neither change AFK status nor broadcast a message. Natural AFK detection and activity-based clearing never use or advance this cooldown. All message strings and announcement toggles are configurable. AFK status **does not** grant damage immunity, prevent mob attacks, alter hunger, or otherwise change survival gameplay. The overhead display uses scoreboard teams and does not overwrite existing teams.
 
@@ -58,6 +60,16 @@ Combine an Elytra with a chestplate on an **anvil**, either by dropping both ite
 The plugin stores the original item data to support reconstruction. A Netherite chestplate can be salvaged if the dropped Armored Elytra is destroyed by fire or lava when the salvage option is enabled. When separating in the GUI, the chestplate goes into the player's inventory, or is dropped nearby if there is no room. The Elytra's durability is carried through separation; other changes made to a combined item may not be reflected in the stored originals.
 
 These mechanics are a **clean-room implementation** and do not incorporate PaperTweaks source code. No special XP cost is charged for the custom anvil GUI combination.
+
+### Persistent Passive Animal Drops
+
+This module extends the time that certain **naturally produced items** stay on the ground: chicken eggs (including blue and brown eggs), armadillo scutes, morning gifts from tamed cats, and slimeballs from pandas. The bundled lifetime is **1,800 seconds (30 minutes)**. An optional indefinite mode overrides that timer, but is disabled by default and logs a server warning because accumulated item entities can affect performance.
+
+Only qualifying item spawns are tracked. Detection uses the presence of an eligible nearby animal rather than a guaranteed producer identity, so an unrelated item that spawns very close to an animal may occasionally match. The plugin stores expiry metadata on tracked items; it does not make them invulnerable to pickup or destruction. Expiry is based on elapsed real-world time, including time when their chunks are unloaded.
+
+### Unusual Block Breakage
+
+In **Survival mode**, a player can harvest and keep **budding amethyst** using a pickaxe enchanted with **Silk Touch**. Without Silk Touch, budding amethyst retains normal break/drop behaviour. The plugin observes the completed, uncancelled break; protection plugins can still prevent collection. Other unusual blocks are not supported by this module yet.
 
 ## Requirements
 
@@ -209,6 +221,34 @@ bee-colony-cooperation:
 
 Sharing uses vanilla pollen delivery rather than artificially generating honey; temporary home-hive redirection and return tracking are best-effort. Only loaded chunks are considered. Test with real bees before relying on it in production.
 
+### Persistent passive animal drops
+
+```yaml
+persistent-passive-drops:
+  enabled: true
+  chicken-eggs: true
+  armadillo-scutes: true
+  cat-morning-gifts: true
+  panda-slimeballs: true
+  animal-detection-radius: 1.75
+  lifetime-seconds: 1800
+  # WARNING: Unlimited item lifetimes may cause server lag.
+  # Overrides lifetime-seconds; disabled by default.
+  indefinite: false
+```
+
+The animal-detection radius helps identify natural item spawns; it is not a guarantee of exact producer attribution. A finite lifetime is recommended on busy survival servers.
+
+### Unusual block breakage
+
+```yaml
+unusual-block-breakage:
+  enabled: true
+  budding-amethyst: true
+```
+
+Only Silk Touch **pickaxes** in Survival can retrieve budding amethyst with this option enabled.
+
 ### Other module settings
 
 ```yaml
@@ -275,9 +315,10 @@ This is a **shortened example**, not the full configurable message library. See 
 
 ## Design and compatibility notes
 
-- Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, and armor benefits from Armored Elytras are the intended equipment exception.
+- Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, while Armored Elytras and Silk Touch budding-amethyst harvesting are explicit gameplay exceptions.
 - Other plugins managing scoreboards, custom inventories, item metadata, signs, or bee AI may cause conflicts. Test changes on a staging server.
 - Experimental bee behaviour has not been fully validated over long periods.
+- Passive item lifetimes may increase entity counts; indefinite preservation should be used cautiously. Passive drop attribution is proximity-based.
 - Using workstations for Armored Elytras supports normal clicks and shift-clicks; test unusual third-party inventory interactions before production use.
 
 ## Project information

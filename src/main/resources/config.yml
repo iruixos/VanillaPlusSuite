@@ -99,6 +99,8 @@ afk-detection:
   enabled: true
   timeout-seconds: 300
   check-interval-seconds: 5
+  # Only player movement input counts as activity; mob pushing, currents,
+  # and other passive displacement do not clear AFK status.
   movement-threshold: 0.05
 
   # Applies ONLY to manual /afk commands; automatic AFK detection is unaffected.
@@ -180,6 +182,33 @@ bee-colony-cooperation:
   relocation-assistance: true
   # Homeless bees can seek shelter during rain.
   rain-shelter: true
+
+# -----------------------------------------------------------------------------
+# Persistent Passive Animal Drops
+# Applies to freshly spawned animal products, not player-thrown items or death loot.
+# Animal attribution is proximity-based; unusual adjacent item spawns can match.
+# The timer is measured in real-world seconds, including unloaded intervals.
+# -----------------------------------------------------------------------------
+persistent-passive-drops:
+  enabled: true
+  chicken-eggs: true            # Eggs, blue eggs and brown eggs
+  armadillo-scutes: true        # Naturally shed scutes (near armadillos)
+  cat-morning-gifts: true       # Gift item types near tamed adult cats
+  panda-slimeballs: true        # Slimeballs near pandas
+  animal-detection-radius: 1.75
+  lifetime-seconds: 1800        # Default: 30 minutes
+  # WARNING: Indefinite drops can accumulate and cause server lag.
+  # This overrides lifetime-seconds. Disabled by default.
+  indefinite: false
+
+# -----------------------------------------------------------------------------
+# Unusual Block Breakage
+# Allows Silk Touch pickaxes to recover normally unobtainable blocks.
+# Protection plugins and Adventure/Creative rules are respected.
+# -----------------------------------------------------------------------------
+unusual-block-breakage:
+  enabled: true
+  budding-amethyst: true
 
 # -----------------------------------------------------------------------------
 # Custom Death Messages

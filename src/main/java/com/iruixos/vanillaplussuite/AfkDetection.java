@@ -6,6 +6,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.Input;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -217,8 +218,24 @@ final class AfkDetection implements Listener {
         if (to == null) return;
         boolean look = from.getYaw() != to.getYaw() || from.getPitch() != to.getPitch();
         double threshold = Math.max(0, plugin.getConfig().getDouble("afk-detection.movement-threshold", 0.05));
-        boolean moved = from.getWorld().equals(to.getWorld()) && from.distanceSquared(to) >= threshold * threshold;
-        if ((look && enabled("look-around")) || (moved && enabled("movement"))) activity(event.getPlayer());
+        // A position change alone is not evidence of player activity: mobs,
+        // water, pistons and knockback can move an idle player. Require an
+        // actual movement input reported by the client before counting it.
+        Input input = event.getPlayer().getCurrentInput();
+        boolean intentionalMovement = input.isForward() || input.isBackward()
+                || input.isLeft() || input.isRight() || input.isJump();
+        boolean moved = from.getWorld().equals(to.getWorld())
+                && from.distanceSquared(to) >= threshold * threshold;
+        if ((look && enabled("look-around"))
+                || (moved && intentionalMovement && enabled("movement"))) activity(event.getPlayer());
+    }
+    // The input event also handles the start of movement and jumping when
+    // the player's location has not yet visibly changed (e.g. against a wall).
+    @EventHandler public void onInput(PlayerInputEvent event) {
+        if (!enabled("movement")) return;
+        Input input = event.getInput();
+        if (input.isForward() || input.isBackward() || input.isLeft()
+                || input.isRight() || input.isJump()) activity(event.getPlayer());
     }
     @EventHandler public void onInteract(PlayerInteractEvent event) { if (enabled("interactions")) activity(event.getPlayer()); }
     @EventHandler public void onInteractEntity(PlayerInteractEntityEvent event) { if (enabled("interactions")) activity(event.getPlayer()); }

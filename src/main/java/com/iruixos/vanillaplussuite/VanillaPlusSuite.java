@@ -40,6 +40,7 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
     private BeeColonyCooperation beeColony;
     private AfkDetection afkDetection;
     private ArmoredElytras armoredElytras;
+    private PersistentPassiveDrops persistentPassiveDrops;
 
     @Override public void onEnable() {
         saveDefaultConfig();
@@ -58,6 +59,10 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         armoredElytras = new ArmoredElytras(this);
         getServer().getPluginManager().registerEvents(armoredElytras, this);
         armoredElytras.restart();
+        persistentPassiveDrops = new PersistentPassiveDrops(this);
+        getServer().getPluginManager().registerEvents(persistentPassiveDrops, this);
+        persistentPassiveDrops.restart();
+        getServer().getPluginManager().registerEvents(new UnusualBlockBreakage(this), this);
         printStartupBanner();
     }
     /** Always prints a compact banner when the plugin is enabled. */
@@ -88,6 +93,7 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         if (beeColony != null) beeColony.stop();
         if (afkDetection != null) afkDetection.stop();
         if (armoredElytras != null) armoredElytras.stop();
+        if (persistentPassiveDrops != null) persistentPassiveDrops.stop();
     }
 
     private void cancelAllIronDoorTimers() {
@@ -131,7 +137,7 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         }
         if (command.getName().equalsIgnoreCase("sign")) return signCommand(sender, args);
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
-            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); if (afkDetection != null) afkDetection.restart(); if (armoredElytras != null) armoredElytras.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
+            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); if (afkDetection != null) afkDetection.restart(); if (armoredElytras != null) armoredElytras.restart(); if (persistentPassiveDrops != null) persistentPassiveDrops.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
         }
         sender.sendMessage("Usage: /vps reload"); return true;
     }
