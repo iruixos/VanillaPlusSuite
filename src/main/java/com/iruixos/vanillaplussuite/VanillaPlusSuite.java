@@ -38,6 +38,8 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
     private final Random random = new Random();
     private NamespacedKey signOwnerKey;
     private BeeColonyCooperation beeColony;
+    private AfkDetection afkDetection;
+    private ArmoredElytras armoredElytras;
 
     @Override public void onEnable() {
         saveDefaultConfig();
@@ -45,10 +47,17 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         getServer().getPluginManager().registerEvents(this, this);
         Objects.requireNonNull(getCommand("vps")).setExecutor(this);
         Objects.requireNonNull(getCommand("sign")).setExecutor(this);
+        Objects.requireNonNull(getCommand("afk")).setExecutor(this);
         startHarvestTask();
         beeColony = new BeeColonyCooperation(this);
         getServer().getPluginManager().registerEvents(beeColony, this);
         beeColony.restart();
+        afkDetection = new AfkDetection(this);
+        getServer().getPluginManager().registerEvents(afkDetection, this);
+        afkDetection.restart();
+        armoredElytras = new ArmoredElytras(this);
+        getServer().getPluginManager().registerEvents(armoredElytras, this);
+        armoredElytras.restart();
         printStartupBanner();
     }
     /** Always prints a compact banner when the plugin is enabled. */
@@ -77,6 +86,8 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         if (harvestTask != null) harvestTask.cancel();
         cancelAllIronDoorTimers();
         if (beeColony != null) beeColony.stop();
+        if (afkDetection != null) afkDetection.stop();
+        if (armoredElytras != null) armoredElytras.stop();
     }
 
     private void cancelAllIronDoorTimers() {
@@ -97,9 +108,26 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         notices.put(key, now); return true;
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("afk")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Only players can use /afk.");
+                return true;
+            }
+            if (args.length != 0) {
+                message(player, "Usage: /afk");
+                return true;
+            }
+            if (afkDetection == null || !afkDetection.isRunning()) {
+                message(player, "AFK detection is disabled.");
+                return true;
+            }
+            boolean isAfk = afkDetection.toggleManualAfk(player);
+            if (isAfk) message(player, "You are now marked as AFK.");
+            return true;
+        }
         if (command.getName().equalsIgnoreCase("sign")) return signCommand(sender, args);
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
-            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
+            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); if (afkDetection != null) afkDetection.restart(); if (armoredElytras != null) armoredElytras.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
         }
         sender.sendMessage("Usage: /vps reload"); return true;
     }

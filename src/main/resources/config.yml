@@ -127,3 +127,52 @@ death-messages:
     generic:
       - "{player} discovered that Hard difficulty is aptly named."
       - "{player} has left the survival experience. Their dignity did not survive."
+
+# Visual AFK detection only: no invulnerability or changes to survival mechanics.
+afk-detection:
+  enabled: true
+  # Five minutes of inactivity by default.
+  timeout-seconds: 300
+  check-interval-seconds: 5
+  activity:
+    movement: true
+    look-around: true
+    chat: true
+    commands: true
+    interactions: true
+    inventory: true
+  display:
+    marker: "[AFK]"
+    # Options: suffix (after player name), prefix (before player name).
+    position: suffix
+    # Minecraft named colors, e.g. dark_gray, gray, white, yellow, gold.
+    name-color: dark_gray
+    marker-color: yellow
+    tab-list: true
+    overhead-nametag: true
+  # Chat announcements and private return notification.
+  # Use {player} for the player's in-game name and & color codes.
+  messages:
+    broadcast-on-afk: true
+    broadcast-on-return: true
+    notify-on-return: true
+    afk: "&7[Vanilla+] &e{player} &7is now AFK."
+    return: "&7[Vanilla+] &e{player} &7is no longer AFK."
+    private-return: "&7[Vanilla+] &eYour AFK status has been cleared."
+  # Ignore tiny position changes; looking around still counts separately.
+  movement-threshold: 0.05
+
+# Clean-room Armored Elytras: combines dropped Elytra + chestplate on an anvil.
+# Drop the resulting item onto a grindstone to recover both original items.
+# Original item metadata and enchantments are retained for separation.
+armored-elytras:
+  enabled: true
+  anvil-combining: true
+  grindstone-separation: true
+  # Also combine an Elytra and chestplate through the anvil GUI (either input order).
+  anvil-gui-combining: true
+  # Separate an Armored Elytra through the grindstone GUI; chestplate goes to inventory.
+  # If the inventory is full, the chestplate is dropped at the player's feet.
+  grindstone-gui-separation: true
+  # If the combined item burns, its Netherite chestplate is recovered.
+  netherite-fire-salvage: true

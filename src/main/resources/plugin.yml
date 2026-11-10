@@ -1,10 +1,14 @@
 name: VanillaPlusSuite
-version: '1.1.0'
+version: '1.3.1'
 main: com.iruixos.vanillaplussuite.VanillaPlusSuite
 api-version: '26.3'
 author: iruixos
 description: Modular Vanilla+ quality-of-life suite.
 commands:
+  afk:
+    description: Toggle your AFK status
+    usage: /afk
+    permission: vanillaplussuite.afk
   sign:
     description: Format the sign you are looking at
     usage: /sign <color|bold|italic|reset> [color] [line]
@@ -13,6 +17,8 @@ commands:
     usage: /vps reload
     permission: vanillaplussuite.admin
 permissions:
+  vanillaplussuite.afk:
+    default: true
   vanillaplussuite.admin:
     default: op
   vanillaplussuite.sign.color:

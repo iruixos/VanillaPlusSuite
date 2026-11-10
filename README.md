@@ -20,6 +20,8 @@ VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft serve
 | **Sign Editing Utilities** | Adds permission-controlled sign colours, RGB hex colours, and styling commands, with ownership and waxed-sign safeguards. |
 | **Custom Death Messages** | Replaces vanilla death announcements with configurable, randomized, sometimes context-aware messages. Coordinates remain private. |
 | **Bee Colony Cooperation** *(experimental)* | Helps nectar-carrying bees find other hives when their home hive is honey-full, and adds occupancy inspection, activity particles, improved hive selection, relocation assistance, and rain shelter behaviour. |
+| **AFK Detection** | Automatically marks inactive players AFK or lets them toggle it using `/afk`; optional Tab-list/overhead nametags and public announcements. No gameplay immunity. |
+| **Armored Elytras** | Combine an Elytra and chestplate, keep their armor bonuses, then separate them; supports dropped-item or workstation GUI interactions. |
 
 ### Iron doors and trapdoors
 
@@ -43,105 +45,120 @@ Other optional behaviours:
 
 **Limitations:** temporary hive assignment and return-home tracking are best-effort because bees are not present as world entities while inside hives. Only loaded chunks are considered. Other plugins that change bee AI may interfere. Test this module before enabling it on a production server.
 
+### AFK detection
+
+Players automatically enter AFK status after a configurable inactivity period (five minutes by default). `/afk` immediately toggles the status without waiting. Movement, looking around, chatting, commands other than `/afk`, interactions, and inventory activity can clear it. While AFK, the player's name is dark grey and `[AFK]` is yellow in the Tab list and, when supported by the viewer's scoreboard, the overhead nametag. The marker can appear as a prefix or suffix.
+
+Public messages announce when someone goes AFK and returns; a separate private return confirmation is optional. All message strings and announcement toggles are configurable. AFK status **does not** grant damage immunity, prevent mob attacks, alter hunger, or otherwise change survival gameplay. The overhead display uses scoreboard teams and does not overwrite existing teams.
+
+### Armored Elytras
+
+Combine an Elytra with a chestplate on an **anvil**, either by dropping both items on top of it or by placing them into the **anvil GUI** (either slot order). The resulting Armored Elytra is wearable and retains the chestplate's armor properties. Separate it by dropping it onto a **grindstone** or using the **grindstone GUI**; both underlying items are returned. The GUI separation bypasses ordinary disenchanting, so the original enchantments are retained.
+
+The plugin stores the original item data to support reconstruction. A Netherite chestplate can be salvaged if the dropped Armored Elytra is destroyed by fire or lava when the salvage option is enabled. When separating in the GUI, the chestplate goes into the player's inventory, or is dropped nearby if there is no room. The Elytra's durability is carried through separation; other changes made to a combined item may not be reflected in the stored originals.
+
+These mechanics are a **clean-room implementation** and do not incorporate PaperTweaks source code. No special XP cost is charged for the custom anvil GUI combination.
+
 ## Requirements
 
-- **Server:** Paper 26.3 (the current source targets Paper API `26.3.build.244-stable`).
-- **Java:** 25 or newer compatible runtime; source is compiled with `--release 25`.
-- **Build:** Maven, if building from source.
+- **Server:** Paper 26.3 (source targets Paper API `26.3.build.244-stable`).
+- **Java:** 25 (the Maven project compiles with `--release 25`).
+- **Build from source:** Maven, run `mvn clean package`.
+- **Runtime dependencies:** None declared; LuckPerms is optional for permissions management.
 
-No additional runtime plugin dependencies are declared. Folia compatibility is **not** claimed.
+Folia compatibility is **not** claimed.
 
-## Installation
+## Installation and updating
 
-1. Build the project with `mvn clean package`, or use a compatible release JAR if one is provided.
-2. Copy the built JAR from `target/` into your Paper server's `plugins/` directory.
-3. Restart the server to generate `plugins/VanillaPlusSuite/config.yml`.
-4. Adjust the settings to your preference and use `/vps reload` where appropriate. A restart is safest when upgrading the JAR.
+1. Download a compatible release JAR, or build from source with `mvn clean package`.
+2. Place the JAR in `plugins/` on your Paper server.
+3. Restart to generate `plugins/VanillaPlusSuite/config.yml`.
+4. Configure modules to your liking. `/vps reload` reloads configuration; restart after a JAR upgrade.
 
-**Updating:** existing `config.yml` files are not automatically replaced. Compare them with the latest bundled `src/main/resources/config.yml` and manually merge newly added settings. Back up your configuration first.
+**Upgrades:** an existing configuration is not automatically overwritten. Compare your current `config.yml` with the newly bundled [`src/main/resources/config.yml`](src/main/resources/config.yml) and manually merge new options. Back up your config first.
 
 ## Commands
 
 | Command | Description | Permission |
 | --- | --- | --- |
-| `/vps reload` | Reloads configuration and restarts relevant scheduled tasks. | `vanillaplussuite.admin` |
-| `/sign color red` | Apply a named colour to all four lines on the sign you are looking at. | `vanillaplussuite.sign.color` |
-| `/sign color #FF69B4 2` | Apply an RGB colour to line 2 only. | `vanillaplussuite.sign.hex` |
-| `/sign bold [1-4]` | Toggle bold on all lines or one specified line. | `vanillaplussuite.sign.command` + `.sign.format` |
-| `/sign italic [1-4]` | Toggle italic on all lines or one specified line. | `vanillaplussuite.sign.command` + `.sign.format` |
-| `/sign reset [1-4]` | Reset line-level colour and styling on all lines or one line. | `vanillaplussuite.sign.command` |
+| `/vps reload` | Reload the configuration and relevant tasks. | `vanillaplussuite.admin` |
+| `/afk` | Toggle your AFK status immediately. | `vanillaplussuite.afk` |
+| `/sign color red [1-4]` | Colour all lines or the specified line on a targeted sign. | `vanillaplussuite.sign.color` |
+| `/sign color #FF69B4 [1-4]` | Apply RGB text colour. | `vanillaplussuite.sign.hex` |
+| `/sign bold [1-4]` | Toggle bold formatting. | `vanillaplussuite.sign.command`, `vanillaplussuite.sign.format` |
+| `/sign italic [1-4]` | Toggle italic formatting. | `vanillaplussuite.sign.command`, `vanillaplussuite.sign.format` |
+| `/sign reset [1-4]` | Reset sign line-level styling. | `vanillaplussuite.sign.command` |
 
-Sign commands act on the **front** of a targeted sign within the configured maximum distance (6 blocks by default). Omit the line number to affect all four lines. Standard colours, RGB colours, and formatting each have their own config switch. The `/sign` command family also requires sign editing and sign commands to be enabled.
+Sign commands target the **front** of the sign you are looking at (default maximum distance: 6 blocks). Omit the optional line number to affect all four lines. Waxed signs cannot be changed. Normal players may only style recorded signs that they own; legacy/untracked signs require the administrative bypass permission. Sign formatting is not a replacement for a land-claim plugin.
 
-**Sign safeguards:** waxed signs cannot be edited with these commands. Signs tracked by the plugin are associated with the first recorded editor; ordinary players can only use commands on signs recorded as theirs. Existing untracked signs require `vanillaplussuite.sign.admin`. This is not a replacement for a land-claim or protection plugin.
+### Sign formatting syntax
 
-### Sign formatting codes
-
-When permitted by configuration and permissions, sign text entered in the sign editor supports:
-
-- **Standard colours:** `&0`–`&9`, `&a`–`&f` (example: `&aWelcome`).
-- **Formatting:** `&k`, `&l`, `&m`, `&n`, `&o`, `&r` (example: `&lImportant`).
-- **RGB colours:** `&#RRGGBB` (example: `&#FF69B4Pink`).
-
-The plugin does not increase Minecraft's sign character limit or sign width.
+When the corresponding settings and permissions allow it, the sign editor accepts standard colour codes (`&aWelcome`), formatting (`&lImportant`), and RGB colours (`&#FF69B4Pink`). This module does not increase the vanilla sign character limit.
 
 ## Permissions
 
-The following nodes are declared in `plugin.yml` and can be managed through LuckPerms:
-
-| Permission | Purpose | Default |
+| Node | Purpose | Default |
 | --- | --- | --- |
 | `vanillaplussuite.admin` | `/vps reload` | OP |
-| `vanillaplussuite.sign.color` | Standard sign colours | Everyone |
+| `vanillaplussuite.afk` | `/afk` | Everyone |
+| `vanillaplussuite.sign.color` | Named colours / legacy colour codes | Everyone |
 | `vanillaplussuite.sign.hex` | RGB sign colours | Everyone |
-| `vanillaplussuite.sign.format` | Sign formatting | OP |
+| `vanillaplussuite.sign.format` | Text formatting | OP |
 | `vanillaplussuite.sign.command` | Sign styling commands | Everyone |
-| `vanillaplussuite.sign.admin` | Bypass recorded sign ownership requirement | OP |
+| `vanillaplussuite.sign.admin` | Bypass sign ownership check | OP |
 
-Permissions do not override a disabled feature in `config.yml`.
+Permissions can be managed with LuckPerms. They do not override a disabled module.
 
 ## Configuration
 
-Each major module has its own `enabled` setting where applicable. The complete default configuration, including all customizable death messages, is in [`src/main/resources/config.yml`](src/main/resources/config.yml).
+The complete bundled configuration (including the death-message library) is in [`src/main/resources/config.yml`](src/main/resources/config.yml). Most modules have an `enabled` toggle. The examples below reproduce settings from the **customized configuration currently used on your server**, which can differ from fresh-install defaults.
 
-### General modules
+### AFK detection
 
 ```yaml
-anvil-preservation:
+afk-detection:
   enabled: true
-  warn-on-use: true
-  cooldown-seconds: 30
-
-harvest-indicators:
-  enabled: true
-  interval-ticks: 60
-  radius: 8
-  max-blocks-per-player: 300
-  particle-chance: 0.10
-
-pet-protection:
-  enabled: true
-  protect-own: true
-  protect-others: false
-  notify-attacker: true
-
-item-frame-lock:
-  enabled: true
-  require-sneak-to-rotate: true
-  require-sneak-to-remove: false
-
-grave-coordinates:
-  enabled: true
-  send-on-respawn: true
-  send-on-death: false
-
-tool-durability-warning:
-  enabled: true
-  threshold-percent: 10
-  cooldown-seconds: 45
+  timeout-seconds: 300
+  check-interval-seconds: 5
+  movement-threshold: 0.05
+  activity:
+    movement: true
+    look-around: true
+    chat: true
+    commands: true
+    interactions: true
+    inventory: true
+  display:
+    marker: '[AFK]'
+    position: suffix
+    name-color: dark_gray
+    marker-color: yellow
+    tab-list: true
+    overhead-nametag: true
+  messages:
+    broadcast-on-afk: true
+    broadcast-on-return: true
+    notify-on-return: false
+    afk: '&7[Vanilla+] &e{player} &7is now AFK.'
+    return: '&7[Vanilla+] &e{player} &7is no longer AFK.'
+    private-return: '&7[Vanilla+] &eYour AFK status has been cleared.'
 ```
 
-Death coordinates are stored in memory only and are lost after a server restart. The current implementation sends the private notification after respawn; `send-on-death` is present in the default configuration but does not enable a separate on-death notification.
+`position` supports `suffix` (`Steve [AFK]`) or `prefix` (`[AFK] Steve`). The example above uses a dark grey name and yellow marker. `notify-on-return: false` disables the *private* confirmation, while the two public messages remain enabled.
+
+### Armored Elytras
+
+```yaml
+armored-elytras:
+  enabled: true
+  anvil-combining: true
+  grindstone-separation: true
+  anvil-gui-combining: true
+  grindstone-gui-separation: true
+  netherite-fire-salvage: true
+```
+
+The `anvil-combining` and `grindstone-separation` switches control **dropping items on blocks**; the `*-gui-*` switches independently control inventory GUI interactions.
 
 ### Iron doors and trapdoors
 
@@ -152,26 +169,13 @@ iron-door-interaction:
   play-sound: true
   respect-redstone: true
   auto-close:
-    enabled: false
-    delay-seconds: 5
-```
-
-`delay-seconds` is the number of seconds after manual opening, with a minimum effective delay of one second. The same auto-close settings apply to iron doors and iron trapdoors.
-
-### Sign editing
-
-```yaml
-sign-editing:
-  enabled: true
-  commands:
     enabled: true
-    max-distance: 6
-  allow-color-codes: true
-  allow-format-codes: false
-  allow-hex-colors: false
+    delay-seconds: 2
 ```
 
-### Bee Colony Cooperation
+In this example, iron doors and trapdoors automatically close **two seconds** after a player opens them. Both door halves stay synchronized, and powered blocks are not forcibly overridden when redstone protection is enabled. Mobs cannot manually right-click them via this module.
+
+### Bee Colony Cooperation (experimental)
 
 ```yaml
 bee-colony-cooperation:
@@ -192,7 +196,49 @@ bee-colony-cooperation:
   rain-shelter: true
 ```
 
-`empty-hives-only` applies to alternative honey-sharing destinations. The hive-selection and relocation logic also considers hive capacity. Avoid excessively large scan radii or frequent scans on busy servers.
+Sharing uses vanilla pollen delivery rather than artificially generating honey; temporary home-hive redirection and return tracking are best-effort. Only loaded chunks are considered. Test with real bees before relying on it in production.
+
+### Other module settings
+
+```yaml
+anvil-preservation:
+  enabled: true
+  warn-on-use: true
+  cooldown-seconds: 30
+harvest-indicators:
+  enabled: true
+  interval-ticks: 60
+  radius: 8
+  max-blocks-per-player: 300
+  particle-chance: 0.1
+pet-protection:
+  enabled: true
+  protect-own: true
+  protect-others: false
+  notify-attacker: true
+item-frame-lock:
+  enabled: true
+  require-sneak-to-rotate: true
+  require-sneak-to-remove: true
+grave-coordinates:
+  enabled: true
+  send-on-respawn: true
+  send-on-death: false
+tool-durability-warning:
+  enabled: true
+  threshold-percent: 10
+  cooldown-seconds: 45
+sign-editing:
+  enabled: true
+  commands:
+    enabled: true
+    max-distance: 6
+  allow-color-codes: true
+  allow-format-codes: true
+  allow-hex-colors: true
+```
+
+Death coordinates are sent privately upon respawn and are held in memory only. The `grave-coordinates.send-on-death` key remains in the config but is not currently used to send a second message on death. Anvil preservation only *warns*; it does not prevent breaking. Tool durability warnings do not repair items.
 
 ### Custom death messages
 
@@ -214,16 +260,18 @@ death-messages:
       - "{player} discovered that Hard difficulty is aptly named."
 ```
 
-This is a **shortened example**, not the complete default death-message library. The bundled config includes categories for fall, contextual falls, lava, fire, drowning, lightning, void, suffocation, starvation, freezing, magic, explosions, projectiles, mobs, village-adjacent mob deaths, PvP, Nether, and generic deaths. Use `{player}` for the deceased player and `{killer}` for PvP messages.
+This is a **shortened example**, not the full configurable message library. See `config.yml` for every death category. The `{player}` placeholder identifies the deceased; `{killer}` is intended for PvP messages. Grave coordinates are private and separate from public death announcements.
+
+## Startup console banner
+
+The compact ASCII-style banner appears whenever the plugin enables. The plugin version and Minecraft version are detected automatically, and the border adjusts to the text length. **There is no configuration toggle.**
 
 ## Design and compatibility notes
 
-- Intended for a **near-vanilla Hard Survival** experience.
-- Most gameplay changes are independently configurable; the startup banner is not.
-- Iron-door/trapdoor interaction listens for player interaction only; mobs may still activate vanilla redstone devices where Minecraft permits.
-- Existing protection plugins can cancel interactions before the plugin processes them.
-- Bee Colony Cooperation is experimental and needs longer-term in-game validation.
-- Test upgrades on a staging server, particularly when other plugins also alter signs, bee AI, or block interactions.
+- Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, and armor benefits from Armored Elytras are the intended equipment exception.
+- Other plugins managing scoreboards, custom inventories, item metadata, signs, or bee AI may cause conflicts. Test changes on a staging server.
+- Experimental bee behaviour has not been fully validated over long periods.
+- Using workstations for Armored Elytras supports normal clicks and shift-clicks; test unusual third-party inventory interactions before production use.
 
 ## Project information
 
@@ -235,6 +283,4 @@ This is a **shortened example**, not the complete default death-message library.
 
 ## License
 
-VanillaPlusSuite is licensed under the MIT License.
-See the [LICENSE](LICENSE) file for details.
-
+VanillaPlusSuite is licensed under the MIT License. See [LICENSE](LICENSE) for details.
