@@ -121,8 +121,12 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
                 message(player, "AFK detection is disabled.");
                 return true;
             }
-            boolean isAfk = afkDetection.toggleManualAfk(player);
-            if (isAfk) message(player, "You are now marked as AFK.");
+            AfkDetection.ManualAfkResult result = afkDetection.toggleManualAfk(player);
+            if (!result.accepted()) {
+                message(player, "Please wait " + result.remainingSeconds() + " second(s) before using /afk again.");
+                return true;
+            }
+            if (result.nowAfk()) message(player, "You are now marked as AFK.");
             return true;
         }
         if (command.getName().equalsIgnoreCase("sign")) return signCommand(sender, args);

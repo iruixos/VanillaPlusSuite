@@ -27,6 +27,17 @@ final class AfkDetection implements Listener {
     private final Map<UUID, Component> originalTabNames = new HashMap<>();
     private final Map<UUID, String> ownedTeams = new HashMap<>();
     private final Set<UUID> afk = new HashSet<>();
+    // Manual /afk history is independent from natural inactivity detection.
+    private final Map<UUID, ManualCooldown> manualCooldowns = new HashMap<>();
+
+    private static final class ManualCooldown {
+        int uses;
+        long lastUseMillis;
+        long blockedUntilMillis;
+    }
+
+    record ManualAfkResult(boolean accepted, boolean nowAfk, long remainingSeconds) {}
+
     private BukkitTask checkTask;
 
     AfkDetection(JavaPlugin plugin) { this.plugin = plugin; }
@@ -56,6 +67,10 @@ final class AfkDetection implements Listener {
     private void checkPlayers() {
         long now = System.currentTimeMillis();
         long timeout = Math.max(1, plugin.getConfig().getLong("afk-detection.timeout-seconds", 300)) * 1000L;
+        // Avoid retaining offline players' expired cooldown history indefinitely.
+        manualCooldowns.entrySet().removeIf(entry ->
+                now >= entry.getValue().blockedUntilMillis
+                && now - entry.getValue().lastUseMillis >= resetAfterMillis());
         for (Player player : Bukkit.getOnlinePlayers()) {
             UUID uuid = player.getUniqueId();
             lastActivity.putIfAbsent(uuid, now);
@@ -63,18 +78,49 @@ final class AfkDetection implements Listener {
         }
     }
 
-    /** Toggle AFK immediately on player request. Regular activity still clears the status. */
-    boolean toggleManualAfk(Player player) {
-        if (checkTask == null) return false;
+    /** Only successful /afk invocations advance the escalating cooldown. */
+    ManualAfkResult toggleManualAfk(Player player) {
+        if (checkTask == null) return new ManualAfkResult(false, false, 0);
         UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        ManualCooldown state = manualCooldowns.computeIfAbsent(uuid, ignored -> new ManualCooldown());
+
+        // Never reset or shorten a cooldown that is already active.
+        if (now < state.blockedUntilMillis) {
+            long seconds = (state.blockedUntilMillis - now + 999L) / 1000L;
+            return new ManualAfkResult(false, afk.contains(uuid), seconds);
+        }
+
+        // The escalation resets after the configured idle window since the last
+        // successful manual invocation. Natural AFK changes don't affect this.
+        if (state.uses > 0 && now - state.lastUseMillis >= resetAfterMillis()) {
+            state.uses = 0;
+        }
+        state.uses++;
+        state.lastUseMillis = now;
+        long cooldownSeconds = configuredCooldownSeconds(state.uses);
+        state.blockedUntilMillis = now + cooldownSeconds * 1000L;
+
         if (afk.contains(uuid)) {
             clearAfk(player, true);
-            lastActivity.put(uuid, System.currentTimeMillis());
+            lastActivity.put(uuid, now);
         } else {
-            lastActivity.putIfAbsent(uuid, System.currentTimeMillis());
+            lastActivity.putIfAbsent(uuid, now);
             setAfk(player);
         }
-        return afk.contains(uuid);
+        return new ManualAfkResult(true, afk.contains(uuid), 0);
+    }
+
+    private long resetAfterMillis() {
+        return Math.max(1L, plugin.getConfig().getLong(
+                "afk-detection.manual-cooldown.reset-after-seconds", 300L)) * 1000L;
+    }
+
+    private long configuredCooldownSeconds(int useCount) {
+        List<Integer> steps = plugin.getConfig().getIntegerList("afk-detection.manual-cooldown.steps-seconds");
+        if (steps.isEmpty()) steps = List.of(0, 15, 30, 60, 900);
+        // Repeated use past the last configured step keeps the final cooldown.
+        return Math.max(0L, steps.get(Math.min(useCount, steps.size()) - 1));
     }
 
     boolean isRunning() { return checkTask != null; }

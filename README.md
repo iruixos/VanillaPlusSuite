@@ -20,7 +20,7 @@ VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft serve
 | **Sign Editing Utilities** | Adds permission-controlled sign colours, RGB hex colours, and styling commands, with ownership and waxed-sign safeguards. |
 | **Custom Death Messages** | Replaces vanilla death announcements with configurable, randomized, sometimes context-aware messages. Coordinates remain private. |
 | **Bee Colony Cooperation** *(experimental)* | Helps nectar-carrying bees find other hives when their home hive is honey-full, and adds occupancy inspection, activity particles, improved hive selection, relocation assistance, and rain shelter behaviour. |
-| **AFK Detection** | Automatically marks inactive players AFK or lets them toggle it using `/afk`; optional Tab-list/overhead nametags and public announcements. No gameplay immunity. |
+| **AFK Detection** | Automatically marks inactive players AFK or lets them toggle it using `/afk`, with configurable escalating manual-command cooldowns, Tab-list/overhead nametags, and announcements. No gameplay immunity. |
 | **Armored Elytras** | Combine an Elytra and chestplate, keep their armor bonuses, then separate them; supports dropped-item or workstation GUI interactions. |
 
 ### Iron doors and trapdoors
@@ -47,9 +47,9 @@ Other optional behaviours:
 
 ### AFK detection
 
-Players automatically enter AFK status after a configurable inactivity period (five minutes by default). `/afk` immediately toggles the status without waiting. Movement, looking around, chatting, commands other than `/afk`, interactions, and inventory activity can clear it. While AFK, the player's name is dark grey and `[AFK]` is yellow in the Tab list and, when supported by the viewer's scoreboard, the overhead nametag. The marker can appear as a prefix or suffix.
+Players automatically enter AFK status after a configurable inactivity period (five minutes by default). `/afk` manually toggles the status, subject to a configurable escalating cooldown intended to discourage chat announcement spam. Movement, looking around, chatting, commands other than `/afk`, interactions, and inventory activity can clear it. While AFK, the player's name is dark grey and `[AFK]` is yellow in the Tab list and, when supported by the viewer's scoreboard, the overhead nametag. The marker can appear as a prefix or suffix.
 
-Public messages announce when someone goes AFK and returns; a separate private return confirmation is optional. All message strings and announcement toggles are configurable. AFK status **does not** grant damage immunity, prevent mob attacks, alter hunger, or otherwise change survival gameplay. The overhead display uses scoreboard teams and does not overwrite existing teams.
+Public messages announce when someone goes AFK and returns; a separate private return confirmation is optional. Successful manual `/afk` uses increase the cooldown, while blocked attempts neither change AFK status nor broadcast a message. Natural AFK detection and activity-based clearing never use or advance this cooldown. All message strings and announcement toggles are configurable. AFK status **does not** grant damage immunity, prevent mob attacks, alter hunger, or otherwise change survival gameplay. The overhead display uses scoreboard teams and does not overwrite existing teams.
 
 ### Armored Elytras
 
@@ -82,7 +82,7 @@ Folia compatibility is **not** claimed.
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/vps reload` | Reload the configuration and relevant tasks. | `vanillaplussuite.admin` |
-| `/afk` | Toggle your AFK status immediately. | `vanillaplussuite.afk` |
+| `/afk` | Manually toggle AFK status (subject to a configurable cooldown). | `vanillaplussuite.afk` |
 | `/sign color red [1-4]` | Colour all lines or the specified line on a targeted sign. | `vanillaplussuite.sign.color` |
 | `/sign color #FF69B4 [1-4]` | Apply RGB text colour. | `vanillaplussuite.sign.hex` |
 | `/sign bold [1-4]` | Toggle bold formatting. | `vanillaplussuite.sign.command`, `vanillaplussuite.sign.format` |
@@ -111,7 +111,7 @@ Permissions can be managed with LuckPerms. They do not override a disabled modul
 
 ## Configuration
 
-The complete bundled configuration (including the death-message library) is in [`src/main/resources/config.yml`](src/main/resources/config.yml). Most modules have an `enabled` toggle. The examples below reproduce settings from the **customized configuration currently used on your server**, which can differ from fresh-install defaults.
+The complete bundled configuration (including the death-message library) is in [`src/main/resources/config.yml`](src/main/resources/config.yml). Most modules have an `enabled` toggle. The examples below reflect the **bundled configuration**, including your selected defaults. Existing installations retain their own config until it is updated manually.
 
 ### AFK detection
 
@@ -121,6 +121,15 @@ afk-detection:
   timeout-seconds: 300
   check-interval-seconds: 5
   movement-threshold: 0.05
+
+  # Manual /afk command only; automatic AFK detection is unaffected.
+  manual-cooldown:
+    # Cooldown after successful uses: 1st, 2nd, 3rd, 4th, 5th+.
+    steps-seconds: [0, 15, 30, 60, 900]
+    # Reset escalation after 5 minutes since last successful /afk.
+    # Does not shorten an already active cooldown.
+    reset-after-seconds: 300
+
   activity:
     movement: true
     look-around: true
@@ -143,6 +152,8 @@ afk-detection:
     return: '&7[Vanilla+] &e{player} &7is no longer AFK.'
     private-return: '&7[Vanilla+] &eYour AFK status has been cleared.'
 ```
+
+`manual-cooldown.steps-seconds` sets the cooldown **after each successful `/afk` use**: the first use has no delay, the second applies 15 seconds, the third 30 seconds, the fourth 60 seconds, and the fifth and later uses 900 seconds (15 minutes). You can change the number of steps and their durations; once the last step is reached, its delay continues to apply. Blocked attempts show the remaining time privately and do not advance the escalation. `reset-after-seconds` resets the escalation count after five minutes without a successful manual `/afk`, but never cancels a cooldown that is still running. Automatic AFK detection and activity-based status clearing are unaffected. The manual cooldown history is kept in memory, not persisted across server restarts.
 
 `position` supports `suffix` (`Steve [AFK]`) or `prefix` (`[AFK] Steve`). The example above uses a dark grey name and yellow marker. `notify-on-return: false` disables the *private* confirmation, while the two public messages remain enabled.
 
