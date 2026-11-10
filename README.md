@@ -262,10 +262,6 @@ death-messages:
 
 This is a **shortened example**, not the full configurable message library. See `config.yml` for every death category. The `{player}` placeholder identifies the deceased; `{killer}` is intended for PvP messages. Grave coordinates are private and separate from public death announcements.
 
-## Startup console banner
-
-The compact ASCII-style banner appears whenever the plugin enables. The plugin version and Minecraft version are detected automatically, and the border adjusts to the text length. **There is no configuration toggle.**
-
 ## Design and compatibility notes
 
 - Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, and armor benefits from Armored Elytras are the intended equipment exception.
