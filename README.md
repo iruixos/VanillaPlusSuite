@@ -4,7 +4,7 @@
 
 **Small quality-of-life improvements. Familiar vanilla survival.**
 
-VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft servers**, developed by **iruixos**. It adds practical conveniences and optional safeguards while keeping survival gameplay recognizable: no free items, teleport-to-grave commands, automatic repairs, or artificially generated honey. The current documentation covers **v1.4.6**.
+VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft servers**, developed by **iruixos**. It adds practical conveniences and optional safeguards while keeping survival gameplay recognizable: no free items, teleport-to-grave commands, automatic repairs, or artificially generated honey. The current documentation covers **v1.4.7** (including the corrected powder snow bucket placement behaviour).
 
 ## Features
 
@@ -25,7 +25,7 @@ VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft serve
 | **Persistent Passive Animal Drops** | Extend the ground lifetime of naturally produced eggs, armadillo scutes, tamed-cat morning gifts, and panda slimeballs, with an optional indefinite setting. |
 | **Unusual Block Breakage** | Recover budding amethyst in Survival using a Silk Touch pickaxe. |
 | **Mob Silencing** | Silence or unsilence mobs using specially named Name Tags, with a floating `[SILENCED]` indicator that preserves their real nametags. |
-| **Stackable Consumables** | Stack mushroom/rabbit stew, beetroot soup, suspicious stew, water buckets, and lava buckets; defaults to 16 per stack. |
+| **Stackable Consumables** | Stack stews and soups, water, lava, milk and powder snow buckets, and cake; defaults to 16 per stack, with correct container returns. |
 
 ### Sign editing and WayBridge compatibility
 
@@ -97,18 +97,25 @@ A configurable floating `[SILENCED]` text indicator follows silenced mobs with *
 
 ### Stackable Consumables
 
-The following items can stack to **16 by default**, with separate configurable maximums for stews and filled buckets:
+The following items can stack to **16 by default**, with separate configurable maximums for stews and soups, filled buckets, and cake:
 
 | Item | Default maximum | Container returned after use |
 | --- | ---: | --- |
-| Mushroom Stew | 16 | Bowl |
-| Rabbit Stew | 16 | Bowl |
-| Beetroot Soup | 16 | Bowl |
-| Suspicious Stew | 16 | Bowl |
-| Water Bucket | 16 | Empty Bucket |
-| Lava Bucket | 16 | Empty Bucket |
+| Mushroom Stew | 16 | Wooden Bowl |
+| Rabbit Stew | 16 | Wooden Bowl |
+| Beetroot Soup | 16 | Wooden Bowl |
+| Suspicious Stew | 16 | Wooden Bowl |
+| Water Bucket | 16 | Empty Iron Bucket when placed |
+| Lava Bucket | 16 | Empty Iron Bucket when placed |
+| Milk Bucket | 16 | Empty Iron Bucket when drunk |
+| Powder Snow Bucket | 16 | Empty Iron Bucket when placed |
+| Cake | 16 | None; one cake is placed as a block |
 
-Each item type can be enabled or disabled separately. Suspicious Stew with different effects is kept distinct by item metadata. The module uses Paper's item-metadata stack limit and Minecraft's remainder handling: the intended result is one empty bowl per consumed stew and one empty iron bucket per placed liquid source, with containers dropped when inventory space is unavailable. Test these interactions on your Paper build before production use, especially full inventories, stacked bucket placement, hoppers, and lava buckets as furnace fuel. Existing items may need to be handled or refreshed by the plugin before the new limits appear.
+Each item type can be enabled or disabled separately. Suspicious Stews with different effects remain distinct because their item metadata differs. The plugin applies Paper's per-item stack limit; when a stew or soup is consumed, one wooden bowl should return to the inventory, or drop on the ground if no space is available. The equivalent rule applies to empty iron buckets after using filled buckets.
+
+**Powder snow bucket placement (v1.4.7):** Minecraft can replace an entire stack of powder snow buckets with an empty bucket when placing a block. VanillaPlusSuite captures the filled stack before the interaction and, after successful placement, restores the unused powder snow buckets and accounts for the returned empty bucket. For example, placing powder snow from a stack of five should leave **four filled powder snow buckets and one empty iron bucket**, alongside the placed block. This specific case was confirmed in-game after the fix, which is included in the final v1.4.7 release.
+
+Cake remains a normal placeable cake block, eaten one slice at a time after placement. **Inventory-full cases, cauldron interactions, hopper/container automation, and lava buckets used as furnace fuel** merit additional testing. Existing items may need to be processed by the plugin before their new stack limits appear.
 
 ## Requirements
 
@@ -382,12 +389,16 @@ stackable-consumables:
   # Separate size limits, valid range: 1-99.
   stew-stack-size: 16
   bucket-stack-size: 16
+  cake-stack-size: 16
   mushroom-stew: true
   rabbit-stew: true
   beetroot-soup: true
   suspicious-stew: true
   water-buckets: true
   lava-buckets: true
+  milk-buckets: true
+  powder-snow-buckets: true
+  cake: true
 ```
 
 Because existing server configurations are **not automatically overwritten**, merge these new sections into the live `plugins/VanillaPlusSuite/config.yml` when upgrading. The stack size override is an item metadata feature, and its interactions with other inventory plugins should be tested.
@@ -419,7 +430,7 @@ This is a **shortened example**, not the full configurable message library. See 
 - Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, while Armored Elytras and Silk Touch budding-amethyst harvesting are explicit gameplay exceptions.
 - Other plugins managing scoreboards, custom inventories, item metadata, signs, display entities, or bee AI may cause conflicts. Test changes on a staging server.
 - The Mob Silencing indicator uses independent text displays and updates their positions each tick near players; monitor performance with unusually large numbers of silenced mobs.
-- Stacked soups and filled buckets require item-use testing, including container remainders and automation, before production rollout.
+- Stacked foods, filled buckets, and cakes need compatibility testing with other item-modifying plugins and automated inventory systems. Powder snow placement from a stack was verified after the v1.4.7 correction; full-inventory and cauldron cases still warrant testing.
 - Experimental bee behaviour has not been fully validated over long periods.
 - Passive item lifetimes may increase entity counts; indefinite preservation should be used cautiously. Passive drop attribution is proximity-based.
 - Using workstations for Armored Elytras supports normal clicks and shift-clicks; test unusual third-party inventory interactions before production use.

@@ -2,8 +2,11 @@ package com.iruixos.vanillaplussuite;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.event.block.Action;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.GameMode;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -26,12 +29,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitTask;
 
 /**
- * Applies per-item max_stack_size metadata to selected foods and filled buckets.
+ * Applies per-item max_stack_size metadata to selected foods, cake, and filled buckets.
  *
- * No artificial use/placement or extra remainder spawning is performed: modern
- * Minecraft handles one bowl on consumption and one bucket on fluid placement,
- * including inventory-full drops. Manually granting a second remainder here
- * would duplicate items. This behaviour should be verified on the target Paper build.
+ * Normal consumables and fluid buckets retain vanilla remainder handling.
+ * Powder snow buckets need a narrowly scoped workaround for Minecraft's
+ * overstacked solid-bucket replacement logic (MC-279773).
  */
 final class StackableConsumables implements Listener {
     private final VanillaPlusSuite plugin;
@@ -76,6 +78,12 @@ final class StackableConsumables implements Listener {
                 return plugin.getConfig().getBoolean(base + "beetroot-soup", true) ? foodSize() : 0;
             case SUSPICIOUS_STEW:
                 return plugin.getConfig().getBoolean(base + "suspicious-stew", true) ? foodSize() : 0;
+            case CAKE:
+                return plugin.getConfig().getBoolean(base + "cake", true) ? cakeSize() : 0;
+            case MILK_BUCKET:
+                return plugin.getConfig().getBoolean(base + "milk-buckets", true) ? bucketSize() : 0;
+            case POWDER_SNOW_BUCKET:
+                return plugin.getConfig().getBoolean(base + "powder-snow-buckets", true) ? bucketSize() : 0;
             case WATER_BUCKET:
                 return plugin.getConfig().getBoolean(base + "water-buckets", true) ? bucketSize() : 0;
             case LAVA_BUCKET:
@@ -87,6 +95,10 @@ final class StackableConsumables implements Listener {
 
     private int foodSize() {
         return Math.max(1, Math.min(99, plugin.getConfig().getInt("stackable-consumables.stew-stack-size", 16)));
+    }
+
+    private int cakeSize() {
+        return Math.max(1, Math.min(99, plugin.getConfig().getInt("stackable-consumables.cake-stack-size", 16)));
     }
 
     private int bucketSize() {
@@ -106,13 +118,24 @@ final class StackableConsumables implements Listener {
         if (previous == null) return original;
         boolean needsSize = !previous.hasMaxStackSize() || previous.getMaxStackSize() != size;
         boolean needsBowl = soup(original.getType()) && !previous.hasUseRemainder();
-        if (!needsSize && !needsBowl) return original;
+        // Milk is consumed as food and needs a container remainder. Powder snow
+        // is PLACED like a block, so assigning a use_remainder BUCKET to it can
+        // double-apply vanilla's own replacement logic. Remove only the vanilla
+        // BUCKET remainder previously written by VanillaPlusSuite 1.4.7.
+        boolean needsBucket = original.getType() == Material.MILK_BUCKET && !previous.hasUseRemainder();
+        boolean removeSnowRemainder = original.getType() == Material.POWDER_SNOW_BUCKET
+                && previous.hasUseRemainder() && previous.getUseRemainder() != null
+                && previous.getUseRemainder().getType() == Material.BUCKET
+                && previous.getUseRemainder().getAmount() == 1;
+        if (!needsSize && !needsBowl && !needsBucket && !removeSnowRemainder) return original;
         ItemStack updated = original.clone();
         ItemMeta meta = updated.getItemMeta();
         if (meta == null) return original;
         meta.setMaxStackSize(size);
         // Retain custom use remainders rather than replacing another plugin's metadata.
         if (needsBowl) meta.setUseRemainder(new ItemStack(Material.BOWL));
+        if (needsBucket) meta.setUseRemainder(new ItemStack(Material.BUCKET));
+        if (removeSnowRemainder) meta.setUseRemainder(null);
         updated.setItemMeta(meta);
         return updated;
     }
@@ -200,6 +223,56 @@ final class StackableConsumables implements Listener {
             if (slot == EquipmentSlot.HAND) player.getInventory().setItemInMainHand(updated);
             else player.getInventory().setItemInOffHand(updated);
         }
+
+        // Powder snow is a placeable solid, unlike water/lava. Its placement
+        // is not reliably repaired using PlayerBucketEmptyEvent. Snapshot the
+        // stack BEFORE vanilla handles the click, then confirm a real block
+        // transition on the following tick before restoring any items.
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK
+                || player.getGameMode() == GameMode.CREATIVE
+                || stackSize(Material.POWDER_SNOW_BUCKET) <= 1
+                || event.useItemInHand() == org.bukkit.event.Event.Result.DENY) return;
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || updated == null
+                || updated.getType() != Material.POWDER_SNOW_BUCKET
+                || updated.getAmount() <= 1) return;
+        Block adjacent = clicked.getRelative(event.getBlockFace());
+        Material clickedBefore = clicked.getType();
+        Material adjacentBefore = adjacent.getType();
+        final int originalSlot = player.getInventory().getHeldItemSlot();
+        final ItemStack remainder = updated.clone();
+        remainder.setAmount(updated.getAmount() - 1);
+        final java.util.UUID playerId = player.getUniqueId();
+
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player live = Bukkit.getPlayer(playerId);
+            if (live == null || !live.isOnline() || !enabled()) return;
+            // Only repair a COMPLETED placement. This also prevents adding
+            // filled buckets after a protection plugin cancels the action.
+            boolean placed = (clickedBefore != Material.POWDER_SNOW
+                    && clicked.getType() == Material.POWDER_SNOW)
+                    || (adjacentBefore != Material.POWDER_SNOW
+                    && adjacent.getType() == Material.POWDER_SNOW)
+                    || (clickedBefore == Material.CAULDRON
+                    && clicked.getType() == Material.POWDER_SNOW_CAULDRON);
+            if (!placed) return;
+            if (slot == EquipmentSlot.HAND
+                    && live.getInventory().getHeldItemSlot() != originalSlot) return;
+            ItemStack actual = slot == EquipmentSlot.HAND
+                    ? live.getInventory().getItemInMainHand()
+                    : live.getInventory().getItemInOffHand();
+            // When vanilla has replaced the entire overstacked solid bucket
+            // with ONE empty bucket, relocate that one real bucket to the
+            // inventory and restore only the filled buckets that were lost.
+            if (actual.getType() != Material.BUCKET || actual.getAmount() != 1) return;
+            if (slot == EquipmentSlot.HAND) live.getInventory().setItemInMainHand(remainder);
+            else live.getInventory().setItemInOffHand(remainder);
+            for (ItemStack overflow : live.getInventory()
+                    .addItem(new ItemStack(Material.BUCKET)).values()) {
+                live.getWorld().dropItemNaturally(live.getLocation(), overflow);
+            }
+            live.updateInventory();
+        });
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

@@ -1,5 +1,5 @@
 name: VanillaPlusSuite
-version: '1.4.6'
+version: '1.4.7'
 main: com.iruixos.vanillaplussuite.VanillaPlusSuite
 api-version: '26.3'
 softdepend: [WayBridge]

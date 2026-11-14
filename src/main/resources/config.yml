@@ -254,7 +254,7 @@ mob-silencing:
   notify-player: true
 
 # -----------------------------------------------------------------------------
-# Stackable Stews, Soups & Filled Buckets
+# Stackable Stews, Soups, Cakes & Filled Buckets
 # Changes only selected items' stack sizes; normal survival use is preserved.
 # One stew consumed returns one empty wooden bowl; pouring one bucket returns
 # one empty iron bucket. Vanilla drops remainders when inventory is full.
@@ -265,6 +265,7 @@ stackable-consumables:
   # Configurable limits (1-99). A default of 16 retains inventory balance.
   stew-stack-size: 16
   bucket-stack-size: 16
+  cake-stack-size: 16
 
   mushroom-stew: true
   rabbit-stew: true
@@ -273,6 +274,10 @@ stackable-consumables:
 
   water-buckets: true
   lava-buckets: true
+  milk-buckets: true
+  powder-snow-buckets: true
+
+  cake: true
 
 # -----------------------------------------------------------------------------
 # Custom Death Messages
