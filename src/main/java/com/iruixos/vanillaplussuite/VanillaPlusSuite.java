@@ -26,6 +26,9 @@ import org.bukkit.inventory.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.ChatColor;
 import java.util.*;
@@ -37,10 +40,13 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
     private final Map<Location, BukkitTask> ironDoorCloseTasks = new HashMap<>();
     private final Random random = new Random();
     private NamespacedKey signOwnerKey;
+    private boolean wayBridgeMissingApiWarned;
     private BeeColonyCooperation beeColony;
     private AfkDetection afkDetection;
     private ArmoredElytras armoredElytras;
     private PersistentPassiveDrops persistentPassiveDrops;
+    private MobSilencing mobSilencing;
+    private StackableConsumables stackableConsumables;
 
     @Override public void onEnable() {
         saveDefaultConfig();
@@ -63,6 +69,13 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         getServer().getPluginManager().registerEvents(persistentPassiveDrops, this);
         persistentPassiveDrops.restart();
         getServer().getPluginManager().registerEvents(new UnusualBlockBreakage(this), this);
+        mobSilencing = new MobSilencing(this);
+        getServer().getPluginManager().registerEvents(mobSilencing, this);
+        mobSilencing.restart();
+        stackableConsumables = new StackableConsumables(this);
+        getServer().getPluginManager().registerEvents(stackableConsumables, this);
+        stackableConsumables.restart();
+        verifyWayBridgeIntegration();
         printStartupBanner();
     }
     /** Always prints a compact banner when the plugin is enabled. */
@@ -94,6 +107,8 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         if (afkDetection != null) afkDetection.stop();
         if (armoredElytras != null) armoredElytras.stop();
         if (persistentPassiveDrops != null) persistentPassiveDrops.stop();
+        if (mobSilencing != null) mobSilencing.stop();
+        if (stackableConsumables != null) stackableConsumables.stop();
     }
 
     private void cancelAllIronDoorTimers() {
@@ -137,23 +152,126 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         }
         if (command.getName().equalsIgnoreCase("sign")) return signCommand(sender, args);
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
-            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); if (afkDetection != null) afkDetection.restart(); if (armoredElytras != null) armoredElytras.restart(); if (persistentPassiveDrops != null) persistentPassiveDrops.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
+            reloadConfig(); startHarvestTask(); cancelAllIronDoorTimers(); if (beeColony != null) beeColony.restart(); if (afkDetection != null) afkDetection.restart(); if (armoredElytras != null) armoredElytras.restart(); if (persistentPassiveDrops != null) persistentPassiveDrops.restart(); if (mobSilencing != null) mobSilencing.restart(); if (stackableConsumables != null) stackableConsumables.restart(); sender.sendMessage("VanillaPlusSuite configuration reloaded."); return true;
         }
         sender.sendMessage("Usage: /vps reload"); return true;
     }
+    /**
+     * Optional WayBridge read-only contract:
+     * public boolean isRegisteredSign(org.bukkit.block.Block block)
+     *
+     * We never inspect sign text, guess PDC keys, or read WayBridge's database.
+     * When WayBridge is enabled but the contract is unavailable, fail closed:
+     * sign modifications must not be able to bypass immutable warp signs.
+     */
+    private boolean canModifyWithWayBridge(Block target, Player player, boolean notify) {
+        Plugin wayBridge = getServer().getPluginManager().getPlugin("WayBridge");
+        if (wayBridge == null || !wayBridge.isEnabled()) return true;
+
+        try {
+            Method lookup = wayBridge.getClass().getMethod("isRegisteredSign", Block.class);
+            if (lookup.getReturnType() != boolean.class && lookup.getReturnType() != Boolean.class) {
+                return rejectUnknownWayBridgeState(player, notify, "Unexpected return type");
+            }
+            Object result = lookup.invoke(wayBridge, target);
+            if (!(result instanceof Boolean registered)) {
+                return rejectUnknownWayBridgeState(player, notify, "Missing registration result");
+            }
+            if (registered) {
+                if (notify && player != null) {
+                    message(player, "This sign is managed by WayBridge and cannot be modified.");
+                }
+                return false;
+            }
+            return true;
+        } catch (NoSuchMethodException ex) {
+            return rejectUnknownWayBridgeState(player, notify, "WayBridge has no public isRegisteredSign(Block) method");
+        } catch (IllegalAccessException | InvocationTargetException | SecurityException | LinkageError ex) {
+            return rejectUnknownWayBridgeState(player, notify, "WayBridge registration check failed: " + ex.getClass().getSimpleName());
+        }
+    }
+
+    private boolean rejectUnknownWayBridgeState(Player player, boolean notify, String reason) {
+        if (!wayBridgeMissingApiWarned) {
+            getLogger().warning("WayBridge sign-registration integration unavailable (" + reason
+                    + "). For safety, VanillaPlusSuite sign edits are blocked while WayBridge is enabled.");
+            wayBridgeMissingApiWarned = true;
+        }
+        if (notify && player != null) {
+            message(player, "Sign editing is unavailable while WayBridge's registration check is not accessible.");
+        }
+        return false;
+    }
+
+    private void verifyWayBridgeIntegration() {
+        Plugin wayBridge = getServer().getPluginManager().getPlugin("WayBridge");
+        if (wayBridge == null || !wayBridge.isEnabled()) return;
+        try {
+            Method lookup = wayBridge.getClass().getMethod("isRegisteredSign", Block.class);
+            if (lookup.getReturnType() != boolean.class && lookup.getReturnType() != Boolean.class) {
+                rejectUnknownWayBridgeState(null, false, "Unexpected return type");
+            } else {
+                getLogger().info("WayBridge registered-sign checks enabled.");
+            }
+        } catch (NoSuchMethodException | SecurityException ex) {
+            rejectUnknownWayBridgeState(null, false, "Missing public isRegisteredSign(Block) method");
+        }
+    }
+
+    // Player-facing help is intentionally split into short, readable lines.
+    // Keep this command reference aligned with the signCommand parser below.
+    private void sendSignHelp(Player player) {
+        player.sendMessage(ChatColor.DARK_GRAY + "──────── " + ChatColor.GOLD
+                + "VanillaPlusSuite " + ChatColor.YELLOW + "Sign Commands"
+                + ChatColor.DARK_GRAY + " ────────");
+        player.sendMessage(ChatColor.YELLOW + "/sign color <color> [line]"
+                + ChatColor.GRAY + " - Set a named or hex text colour.");
+        player.sendMessage(ChatColor.GRAY + "  Examples: " + ChatColor.WHITE
+                + "/sign color red" + ChatColor.DARK_GRAY + " | " + ChatColor.WHITE
+                + "/sign color #FF69B4 2");
+        player.sendMessage(ChatColor.YELLOW + "/sign bold [line]"
+                + ChatColor.GRAY + " - Toggle bold text.");
+        player.sendMessage(ChatColor.YELLOW + "/sign italic [line]"
+                + ChatColor.GRAY + " - Toggle italic text.");
+        player.sendMessage(ChatColor.YELLOW + "/sign reset [line]"
+                + ChatColor.GRAY + " - Reset text styling.");
+        player.sendMessage(ChatColor.YELLOW + "/sign glow [color]"
+                + ChatColor.GRAY + " - Enable glow, optionally set outline dye.");
+        player.sendMessage(ChatColor.GRAY + "  Examples: " + ChatColor.WHITE
+                + "/sign glow light_purple" + ChatColor.DARK_GRAY + " | "
+                + ChatColor.WHITE + "/sign glow #FFAAAA");
+        player.sendMessage(ChatColor.YELLOW + "/sign unglow"
+                + ChatColor.GRAY + " - Disable glowing text.");
+        player.sendMessage(ChatColor.YELLOW + "/sign help"
+                + ChatColor.GRAY + " - Show this command list.");
+        player.sendMessage(ChatColor.DARK_GRAY + "[line] " + ChatColor.GRAY
+                + "is optional (1-4); omitted = all lines. Glow affects the whole front face.");
+        player.sendMessage(ChatColor.DARK_GRAY + "Look at an unwaxed sign you own to edit it.");
+    }
+
     private boolean signCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("Only players can edit signs."); return true; }
         if (!on("sign-editing") || !getConfig().getBoolean("sign-editing.commands.enabled", true)) {
             message(player, "Sign commands are disabled."); return true;
         }
-        if (args.length == 0) { message(player, "Usage: /sign <color|bold|italic|reset> [color] [line 1-4]"); return true; }
+        if (args.length == 0 || (args.length == 1 && args[0].equalsIgnoreCase("help"))) {
+            sendSignHelp(player); return true;
+        }
         String action = args[0].toLowerCase(Locale.ROOT);
         boolean colorAction = action.equals("color");
-        if (!colorAction && !Set.of("bold", "italic", "reset").contains(action)) {
-            message(player, "Usage: /sign <color|bold|italic|reset> [color] [line 1-4]"); return true;
+        boolean glowAction = action.equals("glow") || action.equals("unglow");
+        if (!colorAction && !glowAction && !Set.of("bold", "italic", "reset").contains(action)) {
+            sendSignHelp(player); return true;
+        }
+        // Glow is a per-side property. /sign glow optionally takes a dye name or RGB
+        // colour approximation for the outline; text styles are preserved.
+        if (glowAction && (args.length > (action.equals("glow") ? 2 : 1))) {
+            message(player, "Glow usage: /sign glow [dye_color|#RRGGBB] or /sign unglow");
+            sendSignHelp(player);
+            return true;
         }
         int lineIndex = -1;
-        int lineArg = colorAction ? 2 : 1;
+        int lineArg = colorAction || glowAction ? 2 : 1;
         if (args.length > lineArg + 1 || (colorAction && args.length < 2)) {
             message(player, "Invalid arguments. Optional line number must be 1-4."); return true;
         }
@@ -163,6 +281,7 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
             if (lineIndex < 0 || lineIndex > 3) { message(player, "Line must be from 1 to 4."); return true; }
         }
         TextColor chosenColor = null;
+        DyeColor glowDye = null;
         if (colorAction) {
             String colorInput = args[1];
             boolean hex = colorInput.matches("(?i)#[0-9a-f]{6}");
@@ -182,14 +301,42 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
             }
         } else if (!player.hasPermission("vanillaplussuite.sign.command")) {
             message(player, "You do not have permission to edit sign styling."); return true;
-        } else if (!action.equals("reset") && (!getConfig().getBoolean("sign-editing.allow-format-codes", false)
+        } else if (glowAction && !getConfig().getBoolean("sign-editing.allow-glowing-text", true)) {
+            message(player, "Glowing sign text is disabled."); return true;
+        } else if (!glowAction && !action.equals("reset") && (!getConfig().getBoolean("sign-editing.allow-format-codes", false)
                 || !player.hasPermission("vanillaplussuite.sign.format"))) {
             message(player, "Sign text formatting is disabled or not permitted."); return true;
+        }
+        if (action.equals("glow") && args.length == 2) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            if (input.matches("#[0-9a-f]{6}")) {
+                if (!getConfig().getBoolean("sign-editing.allow-hex-colors", false)
+                        || !player.hasPermission("vanillaplussuite.sign.hex")) {
+                    message(player, "You cannot use hexadecimal sign colors."); return true;
+                }
+                int rgb = Integer.parseInt(input.substring(1), 16);
+                // Native sign glow outlines are restricted to the sixteen dye colors.
+                // Use the nearest dye for the outline; existing text is untouched.
+                glowDye = nearestSignDye(rgb);
+            } else {
+                if (!getConfig().getBoolean("sign-editing.allow-color-codes", true)
+                        || !player.hasPermission("vanillaplussuite.sign.color")) {
+                    message(player, "You cannot use standard sign colors."); return true;
+                }
+                glowDye = signDyeByName(input);
+                if (glowDye == null) {
+                    message(player, "Unknown dye color. Try magenta, light_purple, pink, or #FFAAAA.");
+                    return true;
+                }
+            }
         }
         Block block = player.getTargetBlockExact(Math.max(1, Math.min(12, getConfig().getInt("sign-editing.commands.max-distance", 6))));
         if (block == null || !(block.getState() instanceof Sign sign)) {
             message(player, "Look directly at a sign within range."); return true;
         }
+        // WayBridge's immutable registered warp signs take precedence over
+        // VanillaPlusSuite ownership and even its administrative override.
+        if (!canModifyWithWayBridge(block, player, true)) return true;
         if (sign.isWaxed()) { message(player, "This sign is waxed and cannot be edited."); return true; }
         // Fail closed on untracked signs to avoid bypassing protection plugins.
         String owner = sign.getPersistentDataContainer().get(signOwnerKey, PersistentDataType.STRING);
@@ -199,6 +346,42 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         }
         org.bukkit.block.sign.Side side = org.bukkit.block.sign.Side.FRONT;
         org.bukkit.block.sign.SignSide signSide = sign.getSide(side);
+        if (glowAction) {
+            boolean enableGlow = action.equals("glow");
+            boolean recolor = glowDye != null;
+            if (signSide.isGlowingText() == enableGlow && !recolor) {
+                message(player, "This sign's front text is already " + (enableGlow ? "glowing." : "not glowing."));
+                return true;
+            }
+            if (recolor) {
+                // The vanilla glow outline derives from the sign face's dye colour.
+                // Preserve the existing effective colour of any otherwise uncoloured
+                // text by making the old base colour explicit before changing dye.
+                // Text already carrying Adventure colours, bold, italic, etc. is
+                // never recoloured or reconstructed.
+                TextColor previousBaseColor = TextColor.color(signDyeRgb(signSide.getColor()));
+                for (int i = 0; i < 4; i++) {
+                    Component line = signSide.line(i);
+                    if (line.color() == null) {
+                        signSide.line(i, line.color(previousBaseColor));
+                    }
+                }
+                signSide.setColor(glowDye);
+            }
+            signSide.setGlowingText(enableGlow);
+            if (!sign.update(true, false)) {
+                message(player, "Could not update the sign.");
+                return true;
+            }
+            if (recolor) {
+                message(player, "Glowing outline set to " + glowDye.name().toLowerCase(Locale.ROOT)
+                        + " dye; existing text colours and formatting preserved.");
+            } else {
+                message(player, enableGlow ? "Glowing text enabled on the front of this sign."
+                        : "Glowing text disabled on the front of this sign.");
+            }
+            return true;
+        }
         for (int i = 0; i < 4; i++) {
             if (lineIndex != -1 && i != lineIndex) continue;
             Component original = signSide.line(i);
@@ -223,6 +406,60 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
         sign.update(true, false);
         message(player, "Sign " + action + " applied to " + (lineIndex == -1 ? "all lines" : "line " + (lineIndex + 1)) + ".");
         return true;
+    }
+
+    private static DyeColor signDyeByName(String name) {
+        // Legacy formatting names are accepted as friendly aliases to dye colors.
+        String mapped = switch (name.replace('-', '_')) {
+            case "light_purple" -> "MAGENTA";
+            case "dark_purple" -> "PURPLE";
+            case "gold" -> "ORANGE";
+            case "aqua", "dark_aqua" -> "CYAN";
+            case "dark_blue" -> "BLUE";
+            case "dark_green" -> "GREEN";
+            case "dark_red" -> "RED";
+            case "dark_gray" -> "GRAY";
+            default -> name.toUpperCase(Locale.ROOT);
+        };
+        try { return DyeColor.valueOf(mapped); }
+        catch (IllegalArgumentException ex) { return null; }
+    }
+
+    /** Approximate Minecraft's standard sign-dye palette (not Adventure RGB). */
+    private static int signDyeRgb(DyeColor dye) {
+        return switch (dye) {
+            case BLACK -> 0x000000;
+            case RED -> 0xFF0000;
+            case GREEN -> 0x00FF00;
+            case BROWN -> 0x8B4513;
+            case BLUE -> 0x0000FF;
+            case PURPLE -> 0xA020F0;
+            case CYAN -> 0x00FFFF;
+            case LIGHT_GRAY -> 0xD3D3D3;
+            case GRAY -> 0x808080;
+            case PINK -> 0xFF69B4;
+            case LIME -> 0xBFFF00;
+            case YELLOW -> 0xFFFF00;
+            case LIGHT_BLUE -> 0x9AC0CD;
+            case MAGENTA -> 0xFF00FF;
+            case ORANGE -> 0xFF681F;
+            case WHITE -> 0xFFFFFF;
+        };
+    }
+
+    private static DyeColor nearestSignDye(int rgb) {
+        DyeColor nearest = DyeColor.WHITE;
+        long distance = Long.MAX_VALUE;
+        for (DyeColor candidate : DyeColor.values()) {
+            int sample = signDyeRgb(candidate);
+            int dr = ((rgb >>> 16) & 255) - ((sample >>> 16) & 255);
+            int dg = ((rgb >>> 8) & 255) - ((sample >>> 8) & 255);
+            int db = (rgb & 255) - (sample & 255);
+            // A simple weighted RGB distance, preferring perceived green accuracy.
+            long score = 3L * dr * dr + 4L * dg * dg + 2L * db * db;
+            if (score < distance) { distance = score; nearest = candidate; }
+        }
+        return nearest;
     }
 
     @EventHandler(ignoreCancelled=true) public void onAnvil(InventoryClickEvent e) {
@@ -434,6 +671,8 @@ public final class VanillaPlusSuite extends JavaPlugin implements Listener, Comm
     }
     @EventHandler(ignoreCancelled=true) public void onSign(SignChangeEvent e) {
         if (!on("sign-editing")) return;
+        // Do not stamp/modify WayBridge-managed signs on sign-change events.
+        if (!canModifyWithWayBridge(e.getBlock(), null, false)) return;
         if (e.getBlock().getState() instanceof Sign sign) {
             if (!sign.getPersistentDataContainer().has(signOwnerKey, PersistentDataType.STRING)) {
                 sign.getPersistentDataContainer().set(signOwnerKey, PersistentDataType.STRING,

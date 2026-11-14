@@ -90,6 +90,13 @@ sign-editing:
   allow-color-codes: true
   allow-format-codes: true
   allow-hex-colors: true
+  # /sign glow [dye_color|#RRGGBB] and /sign unglow affect the entire front face.
+  # Examples: /sign glow light_purple, /sign glow magenta, /sign glow #FFAAAA
+  # Dye names select the glow outline colour without overwriting existing text styles.
+  # Hex values select the nearest vanilla dye outline colour (not true RGB glow).
+  # Existing line colours, bold, italic and other styling are preserved.
+  # Requires sign.command; colours also require sign.color or sign.hex permissions.
+  allow-glowing-text: true
 
 # -----------------------------------------------------------------------------
 # AFK Detection
@@ -209,6 +216,63 @@ persistent-passive-drops:
 unusual-block-breakage:
   enabled: true
   budding-amethyst: true
+
+# -----------------------------------------------------------------------------
+# Mob Silencing
+# Use a specially named Name Tag on a mob to silence it permanently.
+# This does not overwrite its custom name; normal renaming still works later.
+# Does not prevent damage, movement, or other vanilla mob behaviours.
+# -----------------------------------------------------------------------------
+mob-silencing:
+  enabled: true
+  # Supported names (case-insensitive; whitespace around the name is ignored).
+  trigger-names:
+    - "silence"
+    - "silence me"
+    - "silence-me"
+    - "silence_me"
+    - "silenceme"
+  # Case-insensitive tags that restore normal mob sounds (without renaming).
+  unsilence-names:
+    - "unsilence"
+    - "unsilence me"
+    - "unsilence-me"
+    - "unsilence_me"
+    - "unsilenceme"
+  # Cosmetic indicator only. The mob's real name remains unchanged.
+  # Text displays are temporary and only maintained close to online players.
+  indicator:
+    enabled: true
+    text: "[SILENCED]"
+    color: gray
+    visible-range: 16
+    show-on-unnamed-mobs: true
+  # Name Tags are consumed in Survival unless disabled here.
+  # Never consumed in Creative; already-silent mobs don't consume another tag.
+  consume-name-tag: true
+  # Private confirmation to the player applying the Name Tag.
+  notify-player: true
+
+# -----------------------------------------------------------------------------
+# Stackable Stews, Soups & Filled Buckets
+# Changes only selected items' stack sizes; normal survival use is preserved.
+# One stew consumed returns one empty wooden bowl; pouring one bucket returns
+# one empty iron bucket. Vanilla drops remainders when inventory is full.
+# -----------------------------------------------------------------------------
+stackable-consumables:
+  enabled: true
+
+  # Configurable limits (1-99). A default of 16 retains inventory balance.
+  stew-stack-size: 16
+  bucket-stack-size: 16
+
+  mushroom-stew: true
+  rabbit-stew: true
+  beetroot-soup: true
+  suspicious-stew: true
+
+  water-buckets: true
+  lava-buckets: true
 
 # -----------------------------------------------------------------------------
 # Custom Death Messages

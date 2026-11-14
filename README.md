@@ -4,7 +4,7 @@
 
 **Small quality-of-life improvements. Familiar vanilla survival.**
 
-VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft servers**, developed by **iruixos**. It adds practical conveniences and optional safeguards while keeping survival gameplay recognizable: no free items, teleport-to-grave commands, automatic repairs, or artificially generated honey.
+VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft servers**, developed by **iruixos**. It adds practical conveniences and optional safeguards while keeping survival gameplay recognizable: no free items, teleport-to-grave commands, automatic repairs, or artificially generated honey. The current documentation covers **v1.4.6**.
 
 ## Features
 
@@ -17,13 +17,21 @@ VanillaPlusSuite is a modular quality-of-life plugin for **Paper Minecraft serve
 | **Iron Door & Trapdoor Interaction** | Lets players right-click iron doors and optionally iron trapdoors, with sound effects, redstone safeguards, and optional timed auto-close. |
 | **Grave Coordinates** | Privately sends the player's death world and XYZ coordinates after respawn. Does not teleport or recover items. |
 | **Tool Durability Warning** | Warns when tool durability drops below a configurable percentage. Does not repair items. |
-| **Sign Editing Utilities** | Adds permission-controlled sign colours, RGB hex colours, and styling commands, with ownership and waxed-sign safeguards. |
+| **Sign Editing Utilities** | Adds permission-controlled sign colours, RGB hex colours, glow controls, and styling commands, with ownership, waxed-sign, and WayBridge safeguards. |
 | **Custom Death Messages** | Replaces vanilla death announcements with configurable, randomized, sometimes context-aware messages. Coordinates remain private. |
 | **Bee Colony Cooperation** *(experimental)* | Helps nectar-carrying bees find other hives when their home hive is honey-full, and adds occupancy inspection, activity particles, improved hive selection, relocation assistance, and rain shelter behaviour. |
 | **AFK Detection** | Automatically marks inactive players AFK or lets them toggle it using `/afk`, with configurable escalating manual-command cooldowns, Tab-list/overhead nametags, and announcements. No gameplay immunity. |
 | **Armored Elytras** | Combine an Elytra and chestplate, keep their armor bonuses, then separate them; supports dropped-item or workstation GUI interactions. |
 | **Persistent Passive Animal Drops** | Extend the ground lifetime of naturally produced eggs, armadillo scutes, tamed-cat morning gifts, and panda slimeballs, with an optional indefinite setting. |
 | **Unusual Block Breakage** | Recover budding amethyst in Survival using a Silk Touch pickaxe. |
+| **Mob Silencing** | Silence or unsilence mobs using specially named Name Tags, with a floating `[SILENCED]` indicator that preserves their real nametags. |
+| **Stackable Consumables** | Stack mushroom/rabbit stew, beetroot soup, suspicious stew, water buckets, and lava buckets; defaults to 16 per stack. |
+
+### Sign editing and WayBridge compatibility
+
+Use `/sign glow [colour]` to enable glowing sign text and `/sign unglow` to disable it (see `/sign help` for the installed command syntax). Named dye colours such as `light_purple` and hex colours such as `#FFAAAA` are supported. Glow changes preserve existing sign text styling; vanilla sign glow applies to an entire sign face and does not accept a line number. Hex glow colours are approximated to a vanilla dye colour. Sign ownership and wax protections remain in force.
+
+When **WayBridge** is installed, registered warp signs are protected against `/sign` editing, including administrative edits. VanillaPlusSuite uses WayBridge's registration API when available and fails closed if it cannot verify registration; this does not change ordinary sign styling.
 
 ### Iron doors and trapdoors
 
@@ -71,6 +79,37 @@ Only qualifying item spawns are tracked. Detection uses the presence of an eligi
 
 In **Survival mode**, a player can harvest and keep **budding amethyst** using a pickaxe enchanted with **Silk Touch**. Without Silk Touch, budding amethyst retains normal break/drop behaviour. The plugin observes the completed, uncancelled break; protection plugins can still prevent collection. Other unusual blocks are not supported by this module yet.
 
+### Mob Silencing
+
+Use a Name Tag renamed to any of the following **case-insensitive** values on a mob. The mob's custom name is preserved, including when an ordinary Name Tag is used to rename it later.
+
+| Silence | Unsilence |
+| --- | --- |
+| `silence` | `unsilence` |
+| `silence me` | `unsilence me` |
+| `silence-me` | `unsilence-me` |
+| `silence_me` | `unsilence_me` |
+| `silenceme` | `unsilenceme` |
+
+A successful silence or unsilence operation consumes one triggering Name Tag in Survival by default, but not in Creative. No extra Name Tag is consumed if the operation does not change the mob's state. Silencing persists between restarts; unsilencing removes the stored silence state and restores the mob's normal sounds. Optional private feedback confirms successful changes.
+
+A configurable floating `[SILENCED]` text indicator follows silenced mobs with **independent per-tick tracking**, without becoming a passenger or replacing the mob's actual nametag. It can appear on unnamed mobs and is maintained near players within the configured visibility range. It does not change mob movement, damage, or normal rider/passenger behaviour.
+
+### Stackable Consumables
+
+The following items can stack to **16 by default**, with separate configurable maximums for stews and filled buckets:
+
+| Item | Default maximum | Container returned after use |
+| --- | ---: | --- |
+| Mushroom Stew | 16 | Bowl |
+| Rabbit Stew | 16 | Bowl |
+| Beetroot Soup | 16 | Bowl |
+| Suspicious Stew | 16 | Bowl |
+| Water Bucket | 16 | Empty Bucket |
+| Lava Bucket | 16 | Empty Bucket |
+
+Each item type can be enabled or disabled separately. Suspicious Stew with different effects is kept distinct by item metadata. The module uses Paper's item-metadata stack limit and Minecraft's remainder handling: the intended result is one empty bowl per consumed stew and one empty iron bucket per placed liquid source, with containers dropped when inventory space is unavailable. Test these interactions on your Paper build before production use, especially full inventories, stacked bucket placement, hoppers, and lava buckets as furnace fuel. Existing items may need to be handled or refreshed by the plugin before the new limits appear.
+
 ## Requirements
 
 - **Server:** Paper 26.3 (source targets Paper API `26.3.build.244-stable`).
@@ -100,8 +139,10 @@ Folia compatibility is **not** claimed.
 | `/sign bold [1-4]` | Toggle bold formatting. | `vanillaplussuite.sign.command`, `vanillaplussuite.sign.format` |
 | `/sign italic [1-4]` | Toggle italic formatting. | `vanillaplussuite.sign.command`, `vanillaplussuite.sign.format` |
 | `/sign reset [1-4]` | Reset sign line-level styling. | `vanillaplussuite.sign.command` |
+| `/sign glow [colour]` | Enable glowing text; optionally select a named dye/hex colour. | `vanillaplussuite.sign.command` and applicable sign styling permission |
+| `/sign unglow` | Remove glowing text from the targeted sign. | `vanillaplussuite.sign.command` |
 
-Sign commands target the **front** of the sign you are looking at (default maximum distance: 6 blocks). Omit the optional line number to affect all four lines. Waxed signs cannot be changed. Normal players may only style recorded signs that they own; legacy/untracked signs require the administrative bypass permission. Sign formatting is not a replacement for a land-claim plugin.
+Sign commands target the **front** of the sign you are looking at (default maximum distance: 6 blocks). Omit the optional line number to affect all four lines. Waxed signs and registered WayBridge signs cannot be changed. Normal players may only style recorded signs that they own; legacy/untracked signs require the administrative bypass permission. Sign formatting is not a replacement for a land-claim plugin.
 
 ### Sign formatting syntax
 
@@ -124,6 +165,21 @@ Permissions can be managed with LuckPerms. They do not override a disabled modul
 ## Configuration
 
 The complete bundled configuration (including the death-message library) is in [`src/main/resources/config.yml`](src/main/resources/config.yml). Most modules have an `enabled` toggle. The examples below reflect the **bundled configuration**, including your selected defaults. Existing installations retain their own config until it is updated manually.
+
+### Sign glow controls
+
+```yaml
+sign-editing:
+  enabled: true
+  commands:
+    enabled: true
+    max-distance: 6
+  allow-color-codes: true
+  allow-format-codes: true
+  allow-hex-colors: true
+```
+
+Use `/sign glow` or `/sign unglow` to change the glow state of an eligible sign. Sign colouring and glowing also respect WayBridge protection when that plugin is installed.
 
 ### AFK detection
 
@@ -291,6 +347,51 @@ sign-editing:
 
 Death coordinates are sent privately upon respawn and are held in memory only. The `grave-coordinates.send-on-death` key remains in the config but is not currently used to send a second message on death. Anvil preservation only *warns*; it does not prevent breaking. Tool durability warnings do not repair items.
 
+### Mob silencing
+
+```yaml
+mob-silencing:
+  enabled: true
+  trigger-names:
+    - "silence"
+    - "silence me"
+    - "silence-me"
+    - "silence_me"
+    - "silenceme"
+  unsilence-names:
+    - "unsilence"
+    - "unsilence me"
+    - "unsilence-me"
+    - "unsilence_me"
+    - "unsilenceme"
+  indicator:
+    enabled: true
+    text: "[SILENCED]"
+    color: gray
+    visible-range: 16
+    show-on-unnamed-mobs: true
+  consume-name-tag: true
+  notify-player: true
+```
+
+### Stackable consumables
+
+```yaml
+stackable-consumables:
+  enabled: true
+  # Separate size limits, valid range: 1-99.
+  stew-stack-size: 16
+  bucket-stack-size: 16
+  mushroom-stew: true
+  rabbit-stew: true
+  beetroot-soup: true
+  suspicious-stew: true
+  water-buckets: true
+  lava-buckets: true
+```
+
+Because existing server configurations are **not automatically overwritten**, merge these new sections into the live `plugins/VanillaPlusSuite/config.yml` when upgrading. The stack size override is an item metadata feature, and its interactions with other inventory plugins should be tested.
+
 ### Custom death messages
 
 ```yaml
@@ -316,7 +417,9 @@ This is a **shortened example**, not the full configurable message library. See 
 ## Design and compatibility notes
 
 - Intended for near-vanilla **Hard Survival**: AFK status is cosmetic/social, while Armored Elytras and Silk Touch budding-amethyst harvesting are explicit gameplay exceptions.
-- Other plugins managing scoreboards, custom inventories, item metadata, signs, or bee AI may cause conflicts. Test changes on a staging server.
+- Other plugins managing scoreboards, custom inventories, item metadata, signs, display entities, or bee AI may cause conflicts. Test changes on a staging server.
+- The Mob Silencing indicator uses independent text displays and updates their positions each tick near players; monitor performance with unusually large numbers of silenced mobs.
+- Stacked soups and filled buckets require item-use testing, including container remainders and automation, before production rollout.
 - Experimental bee behaviour has not been fully validated over long periods.
 - Passive item lifetimes may increase entity counts; indefinite preservation should be used cautiously. Passive drop attribution is proximity-based.
 - Using workstations for Armored Elytras supports normal clicks and shift-clicks; test unusual third-party inventory interactions before production use.

@@ -1,7 +1,8 @@
 name: VanillaPlusSuite
-version: '1.3.4'
+version: '1.4.6'
 main: com.iruixos.vanillaplussuite.VanillaPlusSuite
 api-version: '26.3'
+softdepend: [WayBridge]
 author: iruixos
 description: Modular Vanilla+ quality-of-life suite.
 commands:
@@ -10,8 +11,8 @@ commands:
     usage: /afk
     permission: vanillaplussuite.afk
   sign:
-    description: Format the sign you are looking at
-    usage: /sign <color|bold|italic|reset> [color] [line]
+    description: Format and customize the sign you are looking at (use /sign help)
+    usage: /sign help
   vps:
     description: VanillaPlusSuite administration
     usage: /vps reload
